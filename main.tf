@@ -73,20 +73,6 @@ resource "aws_security_group" "web_sg" {
   }
 }
 
-data "aws_ec2_managed_prefix_list" "cloudfront" {
-  name = "com.amazonaws.global.cloudfront.origin-facing"
-}
-
-resource "aws_security_group_rule" "allow_cloudfront_http" {
-  type              = "ingress"
-  from_port         = 80
-  to_port           = 80
-  protocol          = "tcp"
-  security_group_id = aws_security_group.web_sg.id
-  prefix_list_ids   = [data.aws_ec2_managed_prefix_list.cloudfront.id]
-  description       = "Allow HTTP from CloudFront"
-}
-
 resource "aws_default_vpc" "default" {
   force_destroy = true
   tags = {
