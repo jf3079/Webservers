@@ -38,14 +38,29 @@ jobs:
       - name: Terraform validate
         run: terraform validate
 
+      # Full console output, same as running `terraform plan` locally.
       - name: Terraform plan
         id: plan
         run: |
-          terraform plan -input=false -no-color -out=tfplan
-          terraform show -no-color tfplan > plan.txt
+          set -o pipefail
+          terraform plan -input=false -no-color 2>&1 | tee plan.txt
+
+      # Move the +/-/~ markers to column 0 so GitHub's ```diff block colors them
+      # green/red/orange like the terminal.
+      - name: Build PR comment
+        if: ${{ always() && steps.plan.outcome != 'skipped' }}
+        run: |
+          {
+            echo "### Terraform Plan: ${{ steps.plan.outcome }}"
+            echo '```diff'
+            sed -E 's/^( *)\+/+\1/; s/^( *)-/-\1/; s/^( *)~/!\1/' plan.txt | head -c 60000
+            echo
+            echo '```'
+          } > comment.md
 
       - name: Comment plan on PR
+        if: ${{ always() && steps.plan.outcome != 'skipped' }}
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           header: terraform-plan
-          path: plan.txt
+          path: comment.md

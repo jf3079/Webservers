@@ -9,6 +9,7 @@ on:
 permissions:
   id-token: write
   contents: read
+  pull-requests: write
 
 concurrency:
   group: terraform-network-vpc
@@ -39,4 +40,42 @@ jobs:
         run: terraform init -input=false
 
       - name: Terraform apply
-        run: terraform apply -input=false -auto-approve
+        id: apply
+        run: |
+          set -o pipefail
+          terraform apply -input=false -auto-approve -no-color 2>&1 | tee apply.txt
+
+      - name: Build PR comment
+        if: ${{ always() && steps.apply.outcome != 'skipped' }}
+        run: |
+          {
+            echo "### Terraform Apply: ${{ steps.apply.outcome }}"
+            echo '```diff'
+            sed -E 's/^( *)\+/+\1/; s/^( *)-/-\1/; s/^( *)~/!\1/' apply.txt | head -c 60000
+            echo
+            echo '```'
+          } > comment.md
+
+      # Post the apply output on the PR that was merged into this commit.
+      - name: Comment apply on merged PR
+        if: ${{ always() && steps.apply.outcome != 'skipped' }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('comment.md', 'utf8');
+            const { data: prs } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: context.sha,
+            });
+            if (!prs.length) {
+              core.info('No PR associated with this commit; skipping comment.');
+              return;
+            }
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prs[0].number,
+              body,
+            });
