@@ -22,6 +22,7 @@ jobs:
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "~> 1.16"
+          terraform_wrapper: false # wrapper buffers output; needed off for live streaming
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -38,29 +39,11 @@ jobs:
       - name: Terraform validate
         run: terraform validate
 
-      # Full console output, same as running `terraform plan` locally.
+      # Streams plan output into the PR comment live (and into the Actions log).
       - name: Terraform plan
         id: plan
-        run: |
-          set -o pipefail
-          terraform plan -input=false -no-color 2>&1 | tee plan.txt
-
-      # Move the +/-/~ markers to column 0 so GitHub's ```diff block colors them
-      # green/red/orange like the terminal.
-      - name: Build PR comment
-        if: ${{ always() && steps.plan.outcome != 'skipped' }}
-        run: |
-          {
-            echo "### Terraform Plan: ${{ steps.plan.outcome }}"
-            echo '```diff'
-            sed -E 's/^( *)\+/+\1/; s/^( *)-/-\1/; s/^( *)~/!\1/' plan.txt | head -c 60000
-            echo
-            echo '```'
-          } > comment.md
-
-      - name: Comment plan on PR
-        if: ${{ always() && steps.plan.outcome != 'skipped' }}
-        uses: marocchino/sticky-pull-request-comment@v2
-        with:
-          header: terraform-plan
-          path: comment.md
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: bash .github/scripts/live-comment.sh "Terraform Plan" plan.txt terraform plan -input=false -no-color
