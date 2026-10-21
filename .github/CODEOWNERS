@@ -1,0 +1,8 @@
+# CODEOWNERS file
+
+# This sets the default code owners for the entire repository
+*       @kubra-bp/nsg-admins @lakshmiamarnath
+
+# Specific paths can have different code owners
+# For example, if you have a directory named 'src' and want a different owner
+#/src/   @another-github-username

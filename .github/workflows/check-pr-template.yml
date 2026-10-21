@@ -1,0 +1,36 @@
+name: PR Checklist Validation
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Validate PR checklist
+      id: validate
+      run: |
+        CHECKLIST_ITEMS=(
+          "You have verified that this pull request fulfills the story's scope/description."
+          "You have verified that this pull request fulfills all story acceptance criteria."
+          "You have created any necessary Integration Tests that verify the code being changed appropriately."
+          "There is sufficient documentation of this change to satisfy the Product Manager of this service."
+          "Authorized personnel have reviewed this code and approved it."
+          "This change is ready for Demo to the product manager & rest of the team."
+        )
+
+        for ITEM in "${CHECKLIST_ITEMS[@]}"; do
+          if ! grep -q "\- \[x\] $ITEM" "$GITHUB_EVENT_PATH"; then
+            echo "Checklist item not completed: $ITEM"
+            exit 1
+          fi
+        done
+
+    - name: Allow merge if checklist is complete
+      if: success()
+      run: echo "All checklist items are completed. PR can be merged."
