@@ -2,19 +2,31 @@ provider "aws" {
   region = var.region
 }
 
-terraform {
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 6.0"
-    }
-  }
-  cloud {
-    organization = "KubOrg1"
+# terraform {
+#   required_providers {
+#     aws = {
+#       source  = "hashicorp/aws"
+#       version = "~> 6.0"
+#     }
+#   }
+#   cloud {
+#     organization = "KubOrg1"
 
-    workspaces {
-      name = "Webservers"
-    }
+#     workspaces {
+#       name = "Webservers"
+#     }
+#   }
+# }
+
+terraform {
+  required_version = "~> 1.16"
+
+  backend "s3" {
+    bucket       = "backend-0001"
+    key          = "Webserver/terraform.tfstate"
+    region       = "us-east-1"
+    encrypt      = true
+    use_lockfile = true
   }
 }
 
