@@ -2,6 +2,22 @@ provider "aws" {
   region = var.region
 }
 
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 6.0"
+    }
+  }
+  cloud {
+    organization = "KubOrg1"
+
+    workspaces {
+      name = "Webservers"
+    }
+  }
+}
+
 resource "tls_private_key" "key_pair2" {
   algorithm = "RSA"
   rsa_bits  = 4096
