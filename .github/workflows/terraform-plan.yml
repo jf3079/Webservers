@@ -2,9 +2,6 @@ name: Terraform Plan
 
 on:
   pull_request:
-    paths:
-      - "terraform/**"
-      - ".github/workflows/terraform-plan.yml"
 
 permissions:
   id-token: write
@@ -16,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: terraform/network/vpc
+        working-directory: .
 
     steps:
       - uses: actions/checkout@v4
@@ -50,4 +47,4 @@ jobs:
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           header: terraform-plan
-          path: terraform/network/vpc/plan.txt
+          path: plan.txt
