@@ -75,8 +75,10 @@ jobs:
       # Post plan + apply output on the PR that was merged into this commit.
       - name: Comment plan and apply on merged PR
         if: ${{ always() && steps.plan.outcome != 'skipped' }}
+        continue-on-error: true # a failed comment must not fail an already-applied run
         uses: actions/github-script@v7
         with:
+          retries: 3 # retry transient GitHub API 5xx errors
           script: |
             const fs = require('fs');
             const body = fs.readFileSync('comment.md', 'utf8');
