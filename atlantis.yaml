@@ -1,0 +1,12 @@
+# Repo: github.com/jf3079/Webservers  ->  account 574659690677, us-west-2
+# Place at the repo root. `workflow` is a key of target_accounts in terraform.tfvars.
+version: 3
+automerge: true
+delete_source_branch_on_merge: true
+projects:
+  - name: webservers
+    dir: .
+    workflow: web-usw2
+    autoplan:
+      enabled: true
+      when_modified: ["*.tf", "*.tfvars", "*.tftpl", ".terraform.lock.hcl"]
