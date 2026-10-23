@@ -12,6 +12,8 @@
 name: atlantis-auto-apply
 
 on:
+  pull_request:
+    types: [opened, reopened, synchronize]
   pull_request_review:
     types: [submitted]
   status:
@@ -26,6 +28,32 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Safety net: Atlantis autoplans on its own. If no atlantis/plan status shows
+  # up on the new commit within ~90s (missed webhook, lock, etc.), ask for one.
+  plan:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Request plan if autoplan did not start
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          sleep 90
+          # Stale run: a newer commit was pushed
+          CUR=$(gh pr view "$PR" --repo "$REPO" --json headRefOid --jq .headRefOid)
+          [ "$CUR" = "$HEAD" ] || { echo "Superseded by newer commit"; exit 0; }
+          N=$(gh api "repos/$REPO/commits/$HEAD/status" \
+              --jq '[.statuses[] | select(.context | startswith("atlantis/plan"))] | length')
+          if [ "$N" -eq 0 ]; then
+            gh pr comment "$PR" --repo "$REPO" --body "atlantis plan"
+          else
+            echo "Atlantis already planned this commit"
+          fi
+
   apply:
     if: >-
       (github.event_name == 'pull_request_review' && github.event.review.state == 'approved') ||
