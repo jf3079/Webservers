@@ -22,8 +22,8 @@ terraform {
   required_version = "~> 1.16"
 
   backend "s3" {
-    bucket       = "tf-state-bucket-783a5519"
-    key          = "Webserver/terraform.tfstate"
+    bucket       = "tf-state-bucket-892a1aaa"
+    key          = "web-usw2/terraform.tfstate"
     region       = "us-west-2"
     encrypt      = true
     use_lockfile = true
