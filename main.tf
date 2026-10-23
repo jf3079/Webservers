@@ -24,7 +24,7 @@ terraform {
   backend "s3" {
     bucket       = "tf-state-bucket-892a1aaa"
     key          = "web-usw2/terraform.tfstate"
-    region       = "us-west-2"
+    region       = "us-east-1"
     encrypt      = true
     use_lockfile = true
   }
