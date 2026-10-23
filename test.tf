@@ -93,7 +93,7 @@ resource "aws_instance" "web_server1" {
               EOF
 
   tags = {
-    Name = "web_server1"
+    Name = "web_server134"
   }
 }
 
@@ -106,5 +106,5 @@ output "public_subnet_id" {
 }
 
 output "ec2_public_ip" {
-  value = aws_instance.web_server134.public_ip
+  value = aws_instance.web_server1.public_ip
 }
