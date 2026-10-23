@@ -1,0 +1,85 @@
+# Comments "atlantis apply" automatically once, for the PR's current head commit:
+#   1. every Atlantis plan status on that commit is "success", AND
+#   2. GitHub says all required reviews are met (reviewDecision == APPROVED).
+# It re-evaluates on each approval and each Atlantis plan status, so the order
+# (plan first or approval first) does not matter.
+#
+# Notes:
+# - `status` workflows run from the DEFAULT branch copy of this file, so merge
+#   it to main before it takes effect.
+# - Atlantis still enforces its own apply_requirements (approved, mergeable).
+# - It never retries: if apply fails, fix and comment `atlantis apply` manually.
+name: atlantis-auto-apply
+
+on:
+  pull_request_review:
+    types: [submitted]
+  status:
+
+permissions:
+  contents: read
+  pull-requests: write
+  statuses: read
+
+concurrency:
+  group: atlantis-auto-apply-${{ github.event.sha || github.event.pull_request.head.sha }}
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    if: >-
+      (github.event_name == 'pull_request_review' && github.event.review.state == 'approved') ||
+      (github.event_name == 'status' && startsWith(github.event.context, 'atlantis/plan') && github.event.state == 'success')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Apply when plan is green and approvals are met
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          STATUS_SHA: ${{ github.event.sha }}
+          REVIEW_PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+
+          if [ "$EVENT" = "status" ]; then
+            PR=$(gh api "repos/$REPO/commits/$STATUS_SHA/pulls" \
+                 --jq '[.[] | select(.state=="open")][0].number // empty')
+          else
+            PR="$REVIEW_PR"
+          fi
+          [ -n "${PR:-}" ] || { echo "No open PR for this event"; exit 0; }
+
+          read -r HEAD DECISION < <(gh pr view "$PR" --repo "$REPO" \
+            --json headRefOid,reviewDecision --jq '[.headRefOid, .reviewDecision] | @tsv')
+
+          # Ignore statuses from older commits
+          if [ "$EVENT" = "status" ] && [ "$STATUS_SHA" != "$HEAD" ]; then
+            echo "Status is for an old commit"; exit 0
+          fi
+
+          if [ "$DECISION" != "APPROVED" ]; then
+            echo "Review decision is '$DECISION', not APPROVED"; exit 0
+          fi
+
+          STATUSES=$(gh api "repos/$REPO/commits/$HEAD/status" --jq '.statuses')
+          PLANS=$(echo "$STATUSES" | jq '[.[] | select(.context | startswith("atlantis/plan"))]')
+          if [ "$(echo "$PLANS" | jq 'length')" -eq 0 ] || \
+             [ "$(echo "$PLANS" | jq '[.[] | select(.state != "success")] | length')" -ne 0 ]; then
+            echo "Atlantis plan not (fully) successful yet"; exit 0
+          fi
+
+          if [ "$(echo "$STATUSES" | jq '[.[] | select(.context | startswith("atlantis/apply"))] | length')" -ne 0 ]; then
+            echo "Apply already started/finished for this commit"; exit 0
+          fi
+
+          # Don't comment twice for the same commit
+          SINCE=$(gh api "repos/$REPO/commits/$HEAD" --jq '.commit.committer.date')
+          DUP=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
+                --jq "[.[] | select(.body == \"atlantis apply\" and .created_at > \"$SINCE\")] | length" \
+                | paste -sd+ | bc)
+          if [ "${DUP:-0}" -gt 0 ]; then
+            echo "Apply already requested for this commit"; exit 0
+          fi
+
+          gh pr comment "$PR" --repo "$REPO" --body "atlantis apply"
